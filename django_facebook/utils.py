@@ -205,10 +205,14 @@ def mass_get_or_create(model_class, base_queryset, id_field, default_dict,
         defaults = default_dict[new_id]
         defaults[id_field] = new_id
         defaults.update(global_defaults)
-        model_instance = model_class.objects.create(
-            **defaults
-        )
-        inserted_model_instances.append(model_instance)
+        try:
+            model_instance = model_class.objects.create(
+                **defaults
+            )
+            inserted_model_instances.append(model_instance)
+        except Exception as e:
+            if "Incorrect string value:" in e.args[0]:
+                pass
     # returns a list of existing and new items
     return current_instances, inserted_model_instances
 
