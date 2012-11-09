@@ -43,6 +43,9 @@ for setting_name in required_settings:
     setting_available = locals_dict.get(setting_name) is not None
     assert setting_available, 'Please provide setting %s' % setting_name
 
+# Allow No Form for Signup
+FACEBOOK_REGISTRATION_NO_FORM = getattr(settings,
+                                     'FACEBOOK_REGISTRATION_NO_FORM', None)
 # Allow custom registration template
 FACEBOOK_REGISTRATION_TEMPLATE = getattr(settings,
                                          'FACEBOOK_REGISTRATION_TEMPLATE', ['django_facebook/registration.html', 'registration/registration_form.html'])
