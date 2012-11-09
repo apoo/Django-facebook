@@ -189,8 +189,10 @@ def _register_user(request, facebook, profile_callback=None,
     backend = get_registration_backend()
     logger.info('running backend %s for registration', backend)
 
-    # gets the form class specified in FACEBOOK_REGISTRATION_FORM
-    form_class = get_form_class(backend, request)
+
+    if not facebook_settings.FACEBOOK_REGISTRATION_NO_FORM:
+        # gets the form class specified in FACEBOOK_REGISTRATION_FORM
+        form_class = get_form_class(backend, request)
 
     facebook_data = facebook.facebook_registration_data()
 
@@ -205,21 +207,25 @@ def _register_user(request, facebook, profile_callback=None,
         data['email'] = data['email'].replace(
             '@', '+test%s@' % randint(0, 1000000000))
 
-    form = form_class(data=data, files=request.FILES,
-                      initial={'ip': request.META['REMOTE_ADDR']})
+    if not facebook_settings.FACEBOOK_REGISTRATION_NO_FORM:
+        form = form_class(data=data, files=request.FILES,
+                        initial={'ip': request.META['REMOTE_ADDR']})
 
-    if not form.is_valid():
-        error_message_format = u'Facebook data %s gave error %s'
-        error_message = error_message_format % (facebook_data, form.errors)
-        error = facebook_exceptions.IncompleteProfileError(error_message)
-        error.form = form
-        raise error
+        if not form.is_valid():
+            error_message_format = u'Facebook data %s gave error %s'
+            error_message = error_message_format % (facebook_data, form.errors)
+            error = facebook_exceptions.IncompleteProfileError(error_message)
+            error.form = form
+            raise error
 
     try:
         #for new registration systems use the backends methods of saving
         new_user = None
         if backend:
-            new_user = backend.register(request, **form.cleaned_data)
+            if not facebook_settings.FACEBOOK_REGISTRATION_NO_FORM:
+                new_user = backend.register(request, **form.cleaned_data)
+            else:
+                new_user = backend.register(request, **data)
         #fall back to the form approach
         if not new_user:
             # For backward compatibility, if django-registration form is used
