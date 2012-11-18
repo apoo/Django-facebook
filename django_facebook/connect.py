@@ -58,9 +58,9 @@ def connect_user(request, access_token=None, facebook_graph=None):
         user = _connect_user(request, facebook)
     else:
         email = facebook_data.get('email', False)
-        email_verified = facebook_data.get('verified', False)
+        #email_verified = facebook_data.get('verified', False)
         kwargs = {}
-        if email and email_verified:
+        if email:
             kwargs = {'facebook_email': email}
         auth_user = authenticate(facebook_id=facebook_data['id'], **kwargs)
         if auth_user and not force_registration:
