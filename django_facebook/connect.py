@@ -321,6 +321,9 @@ def _update_user(user, facebook, overwrite=True):
             elif (f in user_field_names and hasattr(user, f)):
                 logger.debug('user field %s changed from %s to %s', f,
                              getattr(user, f), facebook_value)
+                if (f  == 'first_name' or f == 'last_name') and len(facebook_value) > 29:
+                    facebook_value =  facebook_value[:29]
+
                 setattr(user, f, facebook_value)
                 user_dirty = True
 
