@@ -347,7 +347,7 @@ class FacebookUserConverter(object):
         parts = seperation.split(text_url_field)
         for part in parts:
             from django.forms import URLField
-            url_check = URLField(null=True, blank=True)
+            url_check = URLField()
             try:
                 clean_url = url_check.clean(part)
                 return clean_url
