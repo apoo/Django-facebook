@@ -3,9 +3,27 @@ import re
 import sys
 import functools
 
+try:
+    import django_statsd
+except ImportError:
+    django_statsd = None
+
 logger = logging.getLogger(__name__)
 URL_PARAM_RE = re.compile('(?P<k>[^(=|&)]+)=(?P<v>[^&]+)(&|$)')
 URL_PARAM_NO_VALUE_RE = re.compile('(?P<k>[^(&|?)]+)(&|$)')
+
+
+def start_statsd(path):
+    '''
+    Simple wrapper to save some typing
+    '''
+    if django_statsd:
+        django_statsd.start(path)
+
+
+def stop_statsd(path):
+    if django_statsd:
+        django_statsd.stop(path)
 
 
 def base64_url_decode_php_style(inp):
@@ -191,3 +209,18 @@ def camel_to_underscore(name):
     for c in string.ascii_uppercase:
         name = name.replace(c, '_%c' % c)
     return name.strip('_').lower()
+
+
+def is_json(content):
+    '''
+    Unfortunately facebook returns 500s which mean they are down
+    Or 500s with a nice error message because you use open graph wrong
+
+    So we have to figure out which is which :)
+    '''
+    try:
+        json.loads(content)
+        is_json = True
+    except:
+        is_json = False
+    return is_json

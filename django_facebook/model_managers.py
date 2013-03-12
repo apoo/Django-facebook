@@ -3,7 +3,12 @@ from django.core.cache import cache
 from django.db import models
 import operator
 import random
-import datetime
+from datetime import timedelta
+from django_facebook.utils import compatible_datetime as datetime
+from django.contrib.contenttypes.models import ContentType
+import logging
+from open_facebook.exceptions import OAuthException, UnsupportedDeleteRequest
+logger = logging.getLogger(__name__)
 
 
 class FacebookUserManager(models.Manager):
@@ -65,10 +70,39 @@ class OpenGraphShareManager(models.Manager):
 
     def recently_failed(self):
         from django_facebook import settings as facebook_settings
-        now = datetime.datetime.today()
-        recent_delta = datetime.timedelta(
+        now = datetime.now()
+        recent_delta = timedelta(
             days=facebook_settings.FACEBOOK_OG_SHARE_RETRY_DAYS)
         recent = now - recent_delta
         failed = self.failed()
         recently_failed = failed.filter(created_at__gte=recent)
         return recently_failed
+
+    def shares_for_instance(self, instance, user):
+        content_type = ContentType.objects.get_for_model(instance)
+        shares = self.filter(
+            user=user,
+            object_id=instance.id,
+            content_type=content_type,
+            completed_at__isnull=False,
+            removed_at__isnull=True,
+        )
+        return shares
+
+    def remove_shares_for_instance(self, content_object, user):
+        '''
+        Removes all shares for this content_object and user combination
+        '''
+        shares = self.shares_for_instance(content_object, user)
+        shares = shares.filter(
+            completed_at__isnull=False, removed_at__isnull=True)
+        shares = list(shares[:1000])
+        logger.info('found %s shares to remove', len(shares))
+        for share in shares:
+            logger.info('removed share %s', share)
+            try:
+                share.remove()
+            except (OAuthException, UnsupportedDeleteRequest), e:
+                # oauth exceptions happen when tokens are removed
+                # unsupported delete requests when the resource is already removed
+                logger.info('removing share failed, got error %s', e)

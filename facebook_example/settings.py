@@ -116,6 +116,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     #'registration', The default is now not to use django registration
     'django_facebook',
+    'open_facebook',
     'member',
     'south',
     # Uncomment the next line to enable the admin:
@@ -128,6 +129,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 FACEBOOK_APP_ID = '215464901804004'
 FACEBOOK_APP_SECRET = '0aceba27823a9dfefa955f76949fa4b4'
+
 FACEBOOK_STORE_LIKES = True
 FACEBOOK_STORE_FRIENDS = True
 FACEBOOK_LOGIN_DEFAULT_REDIRECT = '/facebook/connect/'
@@ -183,5 +185,12 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+    }
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+        'LOCATION': '127.0.0.1:11211',
     }
 }
