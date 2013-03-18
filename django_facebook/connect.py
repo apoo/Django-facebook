@@ -223,8 +223,10 @@ def _register_user(request, facebook, profile_callback=None,
         new_user = None
         if backend:
             if not facebook_settings.FACEBOOK_REGISTRATION_NO_FORM:
-                new_user = backend.register(request, **form.cleaned_data)
+                form.cleaned_data['facebook'] = facebook
+                new_user = backend.register(request,**form.cleaned_data)
             else:
+                data['facebook'] = facebook
                 new_user = backend.register(request, **data)
         #fall back to the form approach
         if new_user is None:
