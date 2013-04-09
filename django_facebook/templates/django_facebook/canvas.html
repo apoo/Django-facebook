@@ -5,6 +5,20 @@
 {% block content %}
 
 
+{% if request.GET.error_reason %}
+    <h4>Facebook authentication failed</h4>
+    
+    {{ request.GET.error_description }} 
+
+{% endif %}
+
+<h4>Your info!</h4>
+<ul>
+    {% for key, value in signed_request.items %}
+        <li>{{ key }}: {{ value}}</li>
+    {% endfor %}
+</ul>
+
 <h4>Things you like!</h4>
 <ul>
     {% for like in likes %}

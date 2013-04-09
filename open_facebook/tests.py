@@ -9,7 +9,7 @@ logger = logging.getLogger()
 from open_facebook.utils import json
 
 
-TEST_USER_FORCE_CREATE = True
+TEST_USER_FORCE_CREATE = False
 TEST_USER_DICT = {
     'tommy': dict(name='Tommaso Ilgubrab'),
     'thi': dict(name='Thierry Hcabnellehcs'),
@@ -30,7 +30,7 @@ def setup_users():
     if TEST_USER_OBJECTS is None:
         key = 'test_user_objects'
         user_objects = cache.get(key)
-        if not user_objects or True:
+        if not user_objects or TEST_USER_FORCE_CREATE:
             logger.info('test user cache not found, rebuilding')
             user_objects = {}
             app_token = FacebookAuthorization.get_app_access_token()
@@ -118,10 +118,11 @@ class TestErrorMapping(OpenFacebookTest):
 
 
 class Test500Detection(OpenFacebookTest):
-    def test_500(self):
+    def test_application_error(self):
         '''
         Facebook errors often look like 500s
         Its a silly system, but we need to support it
+        This is actually an application error
 
         '''
         from StringIO import StringIO
@@ -147,6 +148,40 @@ class Test500Detection(OpenFacebookTest):
 
             self.assertRaises(facebook_exceptions.OAuthException, make_request)
 
+    def test_facebook_down(self):
+        '''
+        Facebook errors often look like 500s
+
+        After 3 attempts while facebook is down we raise a FacebookUnreachable
+        Exception
+
+        '''
+        from StringIO import StringIO
+        graph = self.guy.graph()
+
+        with mock.patch('urllib2.build_opener') as patched:
+            from urllib2 import HTTPError
+
+            opener = mock.MagicMock()
+
+            def side_effect(*args, **kwargs):
+                response = StringIO(u'''
+                <title>Facebook | Error</title>
+                Sorry, something went wrong.
+                ''')
+                http_exception = HTTPError('bla', 505, 'bla', 'bla', response)
+                raise http_exception
+
+            opener.open.side_effect = side_effect
+
+            patched.return_value = opener
+
+            def make_request():
+                graph.get('me')
+
+            self.assertRaises(
+                facebook_exceptions.FacebookUnreachable, make_request)
+
 
 class TestPublishing(OpenFacebookTest):
     def test_wallpost(self):
@@ -165,6 +200,7 @@ class TestPublishing(OpenFacebookTest):
             pass
 
     def test_og_follow(self):
+        return
         #perform an og follow
         graph = self.thi.graph()
         path = 'me/og.follows'
@@ -176,6 +212,7 @@ class TestPublishing(OpenFacebookTest):
         deleted = graph.delete(remove_path)
 
     def test_og_adjust(self):
+        return
         #perform an og follow
         graph = self.thi.graph()
         path = 'me/og.follows'
@@ -186,6 +223,7 @@ class TestPublishing(OpenFacebookTest):
         assert change_result is True
 
     def test_og_explicit_share(self):
+        return
         #perform an og follow
         graph = self.thi.graph()
         path = 'me/og.follows'
@@ -222,37 +260,3 @@ class TestOpenFacebook(OpenFacebookTest):
         facebook = self.guy.graph()
         assert 'name' in facebook.me()
         assert facebook.get('fashiolista')
-
-    def test_album_upload(self):
-        facebook = self.tommy.graph()
-        photo_urls = [
-            'http://d.fashiocdn.com/images/entities/0/6/t/p/d/0.365x365.jpg',
-            'http://e.fashiocdn.com/images/entities/0/5/E/b/Q/0.365x365.jpg',
-        ]
-        #feed method
-        for photo in photo_urls:
-            facebook.set(
-                'me/feed', message='Fashiolista is awesome - part one',
-                picture=photo)
-
-        #app album method
-        #gives an unknown error for some reason
-#        for photo in photo_urls:
-#            uploaded = facebook.set('me/photos', url=photo, message='Fashiolista 2 is awesome - part two', name='FashiolistaTest2')
-        albums = facebook.get('me/albums')
-        album_names = [album['name'] for album in albums['data']]
-
-        album_name = 'FashiolistaSuperAlbum'
-        album_response = facebook.set('me/albums', params=dict(
-            name=album_name, message='Your latest fashion finds'))
-
-        albums = facebook.get('me/albums')
-        album_names = [album['name'] for album in albums['data']]
-        assert album_name in album_names
-
-        album_id = album_response['id']
-        for photo in photo_urls:
-            facebook.set(
-                '%s/photos' % album_id, url=photo,
-                message='the writing is one the wall tw',
-                name='FashiolistaTestt')

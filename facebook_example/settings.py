@@ -13,6 +13,7 @@ BASE_ROOT = os.path.abspath(
 MANAGERS = ADMINS
 
 # Database config
+USE_TZ = True
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',  # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
@@ -132,7 +133,7 @@ FACEBOOK_APP_SECRET = '0aceba27823a9dfefa955f76949fa4b4'
 
 FACEBOOK_STORE_LIKES = True
 FACEBOOK_STORE_FRIENDS = True
-FACEBOOK_LOGIN_DEFAULT_REDIRECT = '/facebook/connect/'
+FACEBOOK_LOGIN_DEFAULT_REDIRECT = '/facebook/example/'
 
 AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend',
                            'django_facebook.auth_backends.FacebookBackend',)
