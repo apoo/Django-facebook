@@ -1,4 +1,7 @@
-from django.conf.urls.defaults import patterns, url
+try:
+    from django.conf.urls import patterns, url
+except ImportError:
+    from django.conf.urls.defaults import patterns, url
 from django.conf import settings
 
 urlpatterns = patterns('django_facebook.views',
@@ -42,7 +45,7 @@ if settings.DEBUG or True:
 from django_facebook import admin
 
 # putting this here instead of models.py reduces issues with import ordering
-if settings.AUTH_PROFILE_MODULE == 'django_facebook.FacebookProfile':
+if getattr(settings, 'AUTH_PROFILE_MODULE', None) == 'django_facebook.FacebookProfile':
     '''
     If we are using the django facebook profile model, create the model
     and connect it to the user create signal
