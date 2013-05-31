@@ -95,13 +95,9 @@ def smart_str(s, encoding='utf-8', strings_only=False, errors='strict'):
         return s
 
 
-try:
-    from django.utils import simplejson as json
-except ImportError:
-    try:
-        import simplejson as json
-    except ImportError:
-        import json
+# we are no longer supporting python 2.5
+# so we can simply assume import json works
+import json
 
 
 def send_warning(message, request=None, e=None, **extra_data):
@@ -188,6 +184,7 @@ def merge_urls(generated_url, human_url):
 
 
 class memoized(object):
+
     '''Decorator. Caches a function's return value each time it is called.
     If called later with the same arguments, the cached value is returned
     (not reevaluated).
@@ -225,6 +222,20 @@ def camel_to_underscore(name):
     for c in string.ascii_uppercase:
         name = name.replace(c, '_%c' % c)
     return name.strip('_').lower()
+
+
+def validate_is_instance(instance, classes):
+    '''
+    Usage
+    validate_is_instance(10, int)
+    validate_is_instance('a', (str, unicode))
+    '''
+    if not isinstance(classes, tuple):
+        classes = (classes,)
+    correct_instance = isinstance(instance, classes)
+    if not correct_instance:
+        raise ValueError(
+            'Expected instance type %s found %s' % (classes, type(instance)))
 
 
 def is_json(content):

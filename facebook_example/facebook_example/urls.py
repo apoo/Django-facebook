@@ -8,14 +8,9 @@ from django.conf import settings
 # admin.autodiscover()
 
 urlpatterns = patterns('',
-                       #
+                       # facebook and registration urls
                        (r'^facebook/', include('django_facebook.urls')),
-
-                       #what to do with these?
                        (r'^accounts/', include('django_facebook.auth_urls')),
-
-                       # Example:
-                       # (r'^django_facebook_test/', include('django_facebook_test.foo.urls')),
 
                        # Uncomment the admin/doc line below to enable admin documentation:
                        # (r'^admin/doc/', include('django.contrib.admindocs.urls')),
