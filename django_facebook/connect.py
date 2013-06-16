@@ -348,7 +348,7 @@ def _update_user(user, facebook, overwrite=True):
     # update the image if we are allowed and have to
     if facebook_settings.FACEBOOK_STORE_LOCAL_IMAGE:
         image_field = get_user_attribute(user, profile, 'image', True)
-        if not image_field:
+        if not image_field or facebook_settings.FACEBOOK_UPDATE_PROFILE_IMAGE_ON_LOGIN:
             image_name, image_file = _update_image(profile, image_url)
             image_field.save(image_name, image_file)
 
