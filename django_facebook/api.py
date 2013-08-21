@@ -479,8 +479,6 @@ class FacebookUserConverter(object):
 
         # consider the username min and max constraints
         slugified_name = slugified_name[:30]
-        if len(username) < 4:
-            slugified_name = None
 
         return slugified_name
 
