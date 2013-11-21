@@ -228,7 +228,8 @@ class FacebookConnection(object):
             # of course we have two different syntaxes
             if parsed_response.get('error'):
                 cls.raise_error(parsed_response['error']['type'],
-                                parsed_response['error']['message'])
+                                parsed_response['error']['message'],
+                                parsed_response['error'].get('code'))
             elif parsed_response.get('error_code'):
                 cls.raise_error(parsed_response['error_code'],
                                 parsed_response['error_msg'])
@@ -269,7 +270,7 @@ class FacebookConnection(object):
         return server_error
 
     @classmethod
-    def raise_error(cls, error_type, message):
+    def raise_error(cls, error_type, message, error_code=None):
         '''
         Lookup the best error class for the error and raise it
 
@@ -282,12 +283,14 @@ class FacebookConnection(object):
 
         :param message:
             the error message from the facebook api call
+
+        :param error_code:
+            optionally the error code which facebook send
         '''
         default_error_class = facebook_exceptions.OpenFacebookException
-        error_class = None
 
         # get the error code
-        error_code = cls.get_code_from_message(message)
+        error_code = error_code or cls.get_code_from_message(message)
         # also see http://fbdevwiki.com/wiki/Error_codes#User_Permission_Errors
         logger.info('Trying to match error code %s to error class', error_code)
 
@@ -640,6 +643,7 @@ class OpenFacebook(FacebookConnection):
         print graph.get('me')
 
     '''
+
     def __init__(self, access_token=None, prefetched_data=None,
                  expires=None, current_user_id=None):
         '''
@@ -656,6 +660,25 @@ class OpenFacebook(FacebookConnection):
         # hook to store the current user id if representing the
         # facebook connection to a logged in user :)
         self.current_user_id = current_user_id
+
+    def __getstate__(self):
+        '''
+        Turns the object into something easy to serialize
+        '''
+        state = dict(
+            access_token=self.access_token,
+            prefetched_data=self.prefetched_data,
+            expires=self.expires,
+        )
+        return state
+
+    def __setstate__(self, state):
+        '''
+        Restores the object from the state dict
+        '''
+        self.access_token = state['access_token']
+        self.prefetched_data = state['prefetched_data']
+        self.expires = state['expires']
 
     def is_authenticated(self):
         '''
@@ -886,6 +909,7 @@ class TestUser(object):
     '''
     Simple wrapper around test users
     '''
+
     def __init__(self, data):
         self.name = data['name']
         self.id = data['id']

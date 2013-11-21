@@ -134,9 +134,9 @@ def update_user_attributes(user, profile, attributes_dict, save=False):
             logger.info('skipping update of field %s', f)
 
     if save:
-        if user._fb_is_dirty:
+        if getattr(user, '_fb_is_dirty', False):
             user.save()
-        if profile and profile._fb_is_dirty:
+        if profile and getattr(profile, '_fb_is_dirty', False):
             profile.save()
 
 
@@ -248,6 +248,7 @@ class ScriptRedirect(HttpResponse):
     '''
     Redirect for Facebook Canvas pages
     '''
+
     def __init__(self, redirect_to, show_body=True):
         self.redirect_to = redirect_to
         self.location = iri_to_uri(redirect_to)
@@ -332,19 +333,22 @@ def mass_get_or_create(model_class, base_queryset, id_field, default_dict,
     given_ids = map(unicode, default_dict.keys())
     # both ends of the comparison are in unicode ensuring the not in works
     new_ids = [g for g in given_ids if g not in current_ids]
-    inserted_model_instances = []
+    prepared_models = []
     for new_id in new_ids:
         defaults = default_dict[new_id]
         defaults[id_field] = new_id
         defaults.update(global_defaults)
-        try:
-            model_instance = model_class.objects.create(
-                **defaults
-            )
-            inserted_model_instances.append(model_instance)
-        except Exception as e:
-            if "Incorrect string value:" in e.args[0]:
-                pass
+        model_instance = model_class(
+            **defaults
+        )
+        prepared_models.append(model_instance)
+    # efficiently create these objects all at once
+    # django 1.4 only
+    if hasattr(model_class.objects, 'bulk_create'):
+        model_class.objects.bulk_create(prepared_models)
+    else:
+        [m.save() for m in prepared_models]
+    inserted_model_instances = prepared_models
     # returns a list of existing and new items
     return current_instances, inserted_model_instances
 
@@ -441,6 +445,8 @@ def simplify_class_decorator(class_decorator):
     '''
     Makes the decorator syntax uniform
     Regardless if you call the decorator like
+
+    **Decorator examples**::
         @decorator
         or
         @decorator()
@@ -451,10 +457,13 @@ def simplify_class_decorator(class_decorator):
     http://www.artima.com/weblogs/viewpost.jsp?thread=240845
 
     This function makes sure that your decorator class always gets called with
-    __init__(fn, *option_args, *option_kwargs)
-    __call__()
-        return a function which accepts the *args and *kwargs intended
-        for fn
+
+    **Methods called**::
+
+        __init__(fn, *option_args, *option_kwargs)
+        __call__()
+            return a function which accepts the *args and *kwargs intended
+            for fn
     '''
     # this makes sure the resulting decorator shows up as
     # function FacebookRequired instead of outer
@@ -642,6 +651,8 @@ def get_class_for(purpose):
     '''
     mapping = get_class_mapping()
     class_ = mapping[purpose]
+    if isinstance(class_, basestring):
+        class_ = get_class_from_string(class_)
     return class_
 
 

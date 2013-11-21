@@ -33,7 +33,7 @@ class CONNECT_ACTIONS:
         pass
 
 
-def connect_user(request, access_token=None, facebook_graph=None):
+def connect_user(request, access_token=None, facebook_graph=None, connect_facebook=False):
     '''
     Given a request either
 
@@ -51,15 +51,14 @@ def connect_user(request, access_token=None, facebook_graph=None):
     force_registration = request.REQUEST.get('force_registration') or\
         request.REQUEST.get('force_registration_hard')
 
-    connect_facebook = to_bool(request.REQUEST.get('connect_facebook'))
-
     logger.debug('force registration is set to %s', force_registration)
     if connect_facebook and request.user.is_authenticated() and not force_registration:
         # we should only allow connect if users indicate they really want to connect
         # only when the request.CONNECT_FACEBOOK = 1
         # if this isn't present we just do a login
         action = CONNECT_ACTIONS.CONNECT
-        user = _connect_user(request, converter)
+        # default behaviour is not to overwrite old data
+        user = _connect_user(request, converter, overwrite=True)
     else:
         email = facebook_data.get('email', False)
         #email_verified = facebook_data.get('verified', False)
@@ -95,12 +94,17 @@ def connect_user(request, access_token=None, facebook_graph=None):
                     'parallel register encountered, slower thread is doing a login')
                 auth_user = authenticate(
                     facebook_id=facebook_data['id'], **kwargs)
+                if not auth_user:
+                    # We don't have a valid user so raise
+                    raise e
                 action = CONNECT_ACTIONS.LOGIN
                 user = _login_user(request, converter, auth_user, update=False)
 
     _update_likes_and_friends(request, user, converter)
 
     _update_access_token(user, graph)
+
+    logger.info('connect finished with action %s', action)
 
     return action, user
 
@@ -151,10 +155,10 @@ def _update_likes_and_friends(request, user, facebook):
         logger.warn(u'Integrity error encountered during registration, '
                     'probably a double submission %s' % e,
                     exc_info=sys.exc_info(), extra={
-                    'request': request,
-                    'data': {
-                        'body': unicode(e),
-                    }
+                        'request': request,
+                        'data': {
+                            'body': unicode(e),
+                        }
                     })
         transaction.savepoint_rollback(sid)
 
@@ -223,12 +227,13 @@ def _register_user(request, facebook, profile_callback=None,
         form = form_class(data=data, files=request.FILES,
                         initial={'ip': request.META['REMOTE_ADDR']})
 
-        if not form.is_valid():
-            error_message_format = u'Facebook data %s gave error %s'
-            error_message = error_message_format % (facebook_data, form.errors)
-            error = facebook_exceptions.IncompleteProfileError(error_message)
-            error.form = form
-            raise error
+    if not form.is_valid():
+        # show errors in sentry
+        form_errors = form.errors
+        error = facebook_exceptions.IncompleteProfileError(
+            'Facebook signup incomplete')
+        error.form = form
+        raise error
 
     try:
         # for new registration systems use the backends methods of saving
@@ -335,7 +340,8 @@ def _update_user(user, facebook, overwrite=True):
     # update all fields on both user and profile
     for f in facebook_fields:
         facebook_value = facebook_data.get(f, False)
-        if facebook_value:
+        current_value = get_user_attribute(user, profile, f, None)
+        if facebook_value and not current_value:
             attributes_dict[f] = facebook_value
 
     # write the raw data in case we missed something

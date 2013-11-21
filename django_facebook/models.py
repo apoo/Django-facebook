@@ -259,6 +259,7 @@ FacebookProfileModel = FacebookModel
 
 
 class FacebookUser(models.Model):
+
     '''
     Model for storing a users friends
     '''
@@ -305,19 +306,20 @@ class FacebookProfile(FacebookProfileModel):
     '''
     user = models.OneToOneField(get_user_model_setting())
 
+if getattr(settings, 'AUTH_USER_MODEL', None) == 'django_facebook.FacebookCustomUser':
+    try:
+        from django.contrib.auth.models import AbstractUser, UserManager
 
-try:
-    from django.contrib.auth.models import AbstractUser, UserManager
+        class FacebookCustomUser(AbstractUser, FacebookModel):
 
-    class FacebookCustomUser(AbstractUser, FacebookModel):
-        '''
-        The django 1.5 approach to adding the facebook related fields
-        '''
-        objects = UserManager()
-        # add any customizations you like
-        state = models.CharField(max_length=255, blank=True, null=True)
-except ImportError, e:
-    logger.info('Couldnt setup FacebookUser, got error %s', e)
+            '''
+            The django 1.5 approach to adding the facebook related fields
+            '''
+            objects = UserManager()
+            # add any customizations you like
+            state = models.CharField(max_length=255, blank=True, null=True)
+    except ImportError, e:
+        logger.info('Couldnt setup FacebookUser, got error %s', e)
 
 
 class BaseModelMetaclass(ModelBase):
@@ -484,7 +486,7 @@ class OpenGraphShare(BaseModel):
                 self.user, profile, 'facebook_id')
         return BaseModel.save(self, *args, **kwargs)
 
-    def send(self, graph=None):
+    def send(self, graph=None, shared_explicitly=False):
         result = None
         # update the last attempt
         self.last_attempt = datetime.now()
@@ -495,8 +497,9 @@ class OpenGraphShare(BaseModel):
         user_or_profile = get_instance_for_attribute(
             self.user, profile, 'access_token')
         graph = graph or user_or_profile.get_offline_graph()
-        user_enabled = user_or_profile.facebook_open_graph and self.facebook_user_id
-
+        user_enabled = shared_explicitly or \
+            (user_or_profile.facebook_open_graph
+             and self.facebook_user_id)
         # start sharing
         if graph and user_enabled:
             graph_location = '%s/%s' % (
@@ -518,16 +521,20 @@ class OpenGraphShare(BaseModel):
             except OpenFacebookException, e:
                 logger.warn(
                     'Open graph share failed, writing message %s' % e.message)
-                self.error_message = unicode(e)
+                self.error_message = repr(e)
                 self.save()
                 # maybe we need a new access token
-                new_token_required = self.exception_requires_new_token(e)
+                new_token_required = self.exception_requires_new_token(
+                    e, graph)
                 # verify that the token didnt change in the mean time
                 user_or_profile = user_or_profile.__class__.objects.get(
                     id=user_or_profile.id)
                 token_changed = graph.access_token != user_or_profile.access_token
+                logger.info('new token required is %s and token_changed is %s',
+                            new_token_required, token_changed)
                 if new_token_required and not token_changed:
-                    logger.info('a new token is required, setting the flag on the user or profile')
+                    logger.info(
+                        'a new token is required, setting the flag on the user or profile')
                     # time to ask the user for a new token
                     update_user_attributes(self.user, profile, dict(
                         new_token_required=True), save=True)
@@ -541,7 +548,7 @@ class OpenGraphShare(BaseModel):
 
         return result
 
-    def exception_requires_new_token(self, e):
+    def exception_requires_new_token(self, e, graph):
         '''
         Determines if the exceptions is something which requires us to
         ask for a new token. Examples are:
@@ -554,6 +561,14 @@ class OpenGraphShare(BaseModel):
         new_token = False
         if isinstance(e, OAuthException):
             new_token = True
+
+        # if we have publish actions than our token is ok
+        # we get in this flow if Facebook mistakenly marks exceptions
+        # as oAuthExceptions
+        publish_actions = graph.has_permissions(['publish_actions'])
+        if publish_actions:
+            new_token = False
+
         return new_token
 
     def update(self, data, graph=None):
